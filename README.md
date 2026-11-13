@@ -1,48 +1,29 @@
-# Chung Sức Auto Order V2 — Vercel Edition
+# Chung Sức Auto Order V3 — Vercel
 
-## 1. Trạng thái
-Port từ bản Cloudflare V2. Giữ nguyên giao diện HTML/CSS/JS, chế độ demo, sáng/tối, nhập TXT và lọc trùng, đặt nhiều mã có xác nhận, lịch sử, chi tiết, CSV, tìm kiếm, phân trang và giới hạn chi phí. Backend là Vercel Node.js Function, route `/api` giữ nguyên qua rewrite. Không cần Cloudflare, database hoặc Netlify.
+Bản cập nhật theo ảnh tài liệu API chính thức do người dùng cung cấp. Giữ giao diện V2 và bổ sung đặt lẻ, trạng thái hệ thống, lịch sử có tổng đơn/tổng chi. Không chứa API key hoặc token thật. Không gửi đơn thật trong kiểm thử.
 
-Đã chạy `npm run build`, kiểm tra cú pháp JS và `npm test` trên Node 22 (2 nhóm test pass, có kiểm thử entry Vercel, xác thực, giới hạn, kiểm tra giá, mock các endpoint và POST). Kiểm thử trình duyệt tự động bị môi trường chặn điều hướng; chưa kiểm tra end-to-end trên Vercel thật. API nhà cung cấp vẫn chưa được xác minh; demo dùng dữ liệu giả, không mất Xu. Đặt đơn thật mặc định tắt. Chỉ dùng mã mời được phép sử dụng.
+## Cập nhật repo Vercel đang dùng
 
-## 2. Deploy miễn phí trên Vercel (không cần cài Node.js)
-1. Giải nén ZIP. Tạo repo mới tại https://github.com/new, ví dụ `autochungsuc-vercel`, khuyên dùng Private. Repo Cloudflare cũ có thể giữ nguyên; không cần xóa deployment đang kẹt.
-2. Upload **nội dung bên trong ZIP**, không upload nguyên ZIP. Ở thư mục gốc repo cần có `api/`, `lib/`, `public/`, `scripts/`, `tests/`, `package.json`, `vercel.json`, `.gitignore`, `.env.example`. Không upload file chứa key thật. Nếu trình duyệt không upload được file ẩn, giữ chúng bằng Git hoặc tự tạo lại theo ZIP. Không cần tạo `.env` trên GitHub.
-3. Đăng nhập https://vercel.com/signup bằng GitHub. Chọn Hobby nếu chỉ sử dụng cá nhân phi thương mại; dự án thương mại cần gói phù hợp. Vào https://vercel.com/new, Import Git Repository, cấp quyền repo vừa tạo, bấm Import.
-4. Project Name: `autochungsuc-vercel` (hoặc tên còn trống); Framework Preset: Other; Root Directory: mặc định `./`; Build Command: `npm run build`; Output Directory: `public`; Install Command: mặc định. Node.js 22.x đã được khai báo trong package.json. `vercel.json` đã định nghĩa các cài đặt chính, không cần sửa. Không chọn Root Directory là public vì sẽ bỏ qua API.
-5. Bấm Deploy. Khi thành công mở domain production do Vercel cấp, ví dụ `https://autochungsuc-vercel.vercel.app` (tên thực tế phụ thuộc tên còn trống). Demo chạy không cần key. Đặt đơn demo rồi kiểm tra lịch sử.
-6. Kiểm tra backend bằng cách mở `https://TEN-MIEN-THAT.vercel.app/api?action=balance`. Khi chưa cấu hình, phải trả JSON với status 503 và message thiếu cấu hình; sau khi có key và mật khẩu sẽ trả 401 nếu không có mật khẩu. Không dán mật khẩu vào URL. Nếu trả HTML/404, kiểm tra root và rewrite trong vercel.json.
+1. Giải nén ZIP bản vá, tải các file vào **gốc** repo `auto-chung-suc` (nhánh `main`), giữ nguyên các thư mục. Các file trùng tên được thay thế. Không xóa `public/.well-known/chungsucliqi-verify.txt` đã tạo; bản ZIP không chứa token.
+2. Commit, Vercel tự deploy. Nếu cần Deployments → Redeploy. Build command `npm run build`, output `public`, preset Other.
+3. Settings → Environment Variables, Production:
+   - `CS_API_KEY` (Secret): key mới tạo sau khi thu hồi key đã lộ trong ảnh.
+   - `APP_PASSWORD` (Secret): mật khẩu riêng, tối thiểu 16 ký tự.
+   - `CS_ENABLE_ORDER` (Config): `false` để thử đọc dữ liệu.
+   - `CS_MAX_ORDER_TOTAL` (Config): số nguyên dương, ví dụ `5000` Xu, giới hạn **mỗi đơn**, không phải tổng ngày. Chỉ dùng giá trị phù hợp ngân sách.
+4. Các biến `CS_API_KEY_HEADER`, `CS_API_KEY_PREFIX`, `CS_*_PATH` của V2 không còn được sử dụng; có thể để nguyên hoặc xóa. Backend cố định URL HTTPS chính thức và header `X-API-Key`.
+5. Redeploy sau khi chỉnh biến. Mở domain Vercel → Kết nối API → nhập APP_PASSWORD → Kết nối thật. Kiểm tra số dư, sản phẩm, giá, trạng thái và lịch sử. Không cần nhập key thật vào web. Nếu báo 401, kiểm tra mật khẩu web hoặc key đã thu hồi; 429 thì theo Retry-After, không bấm liên tục.
+6. Chỉ khi đọc được dữ liệu đúng và muốn thực sự đặt đơn, sửa `CS_ENABLE_ORDER=true` rồi Redeploy. Xem kỹ giá và số mã trước khi xác nhận. Có thể đổi lại false để khóa. Đơn thật trừ Xu ngay. Không tự gửi lại khi mất mạng; kiểm tra lịch sử.
 
-## 3. API key và biến môi trường
-Vào https://chungsucliqi.com/profile.php → API đặt đơn tự động → Tạo API key. Lưu key riêng tư; bấm Tài liệu API để lấy thông tin chính thức. Không gửi key/token thật vào chat.
+## API thực tế
 
-Vercel → project → Settings → Environment Variables → Add. Chọn Production. Với APP_PASSWORD và CS_API_KEY, bật Sensitive nếu có. Không dùng biến NEXT_PUBLIC_ hoặc đặt key trong public/. Nhập giá trị không kèm dấu nháy.
+`https://chungsucliqi.com/api/v1.php?action=...`, header `X-API-Key`, response `ok/data`, lỗi `error.code/error.message`. Backend map `me`, `products`, `status`, `retail`, `history`, GET `order`, POST `order` / `retail_order` thành giao diện V2. Không cần verify để thử GET me từ server theo tài liệu. Giữ file xác minh domain đang có. Không gọi API từ trình duyệt trực tiếp. Không sử dụng nạp Xu, mua acc clone, mở rương riêng hay đặt đơn tự động theo lịch; chỉ hỗ trợ đơn sản phẩm và đặt lẻ, xem lịch sử các loại.
 
-| Name | Value |
-| --- | --- |
-| APP_PASSWORD | Mật khẩu riêng ngẫu nhiên tối thiểu 16 ký tự |
-| CS_API_KEY | API key Chung Sức |
-| CS_ENABLE_ORDER | false |
-| CS_API_KEY_HEADER | Tên header chính xác trong tài liệu API |
-| CS_API_KEY_PREFIX | Tiền tố theo tài liệu; bỏ qua nếu không có |
-| CS_BALANCE_PATH | Path lấy số dư, bắt đầu bằng / |
-| CS_SERVICES_PATH | Path danh sách dịch vụ |
-| CS_ORDERS_PATH | Path lịch sử |
-| CS_DETAIL_PATH | Path chi tiết |
-| CS_ORDER_PATH | Path đặt đơn |
-| CS_MAX_ORDER_TOTAL | Số dương, giới hạn Xu mỗi lượt |
+- Đơn sản phẩm: mỗi mã một suất, tối đa 200 mã; giá × số mã. Không gửi quantity hoặc allow_duplicate=true. Mã nhập một dòng hoặc dấu phẩy; tự lọc trùng trong một đơn.
+- Đặt lẻ: một mã 5–40 ký tự, số lượt/gói theo min/max trả về, giá lấy từ retail. Nhiều mã phải tạo từng đơn riêng.
+- Mỗi đơn cần client_ref, sinh bằng UUID, lưu tham chiếu chưa xác nhận trong localStorage theo hash nội dung (không lưu key/mật khẩu). Nếu gửi lại cùng nội dung trong cùng trình duyệt, dùng lại tham chiếu khi chưa rõ kết quả; nhà cung cấp quy định trả đơn cũ, không trừ Xu lần hai. Không đảm bảo chống trùng nếu đổi trình duyệt, xóa dữ liệu, đổi nội dung hoặc đặt lại một đơn đã xác nhận. Không tự retry POST. Khi lỗi mạng, kiểm tra lịch sử trước.
+- Backend kiểm tra giá hiện tại, trạng thái dịch vụ và giới hạn chi trước khi gửi. Không có giao dịch giá nguyên tử phía nhà cung cấp; giá vẫn có thể thay đổi giữa đọc và tạo đơn. Đọc số dư thực tế trước khi chi. Không có giới hạn tổng ngày bền vững.
+- 30 lệnh/phút/key theo tài liệu; mỗi lần kết nối/refresh dùng 5 lệnh đọc, đặt đơn dùng thêm lệnh kiểm tra. Không polling tự động. API trả 429 và Retry-After khi có; không retry tự động. Có thể dùng Cloudflare/Vercel firewall bổ sung rate-limit đăng nhập nếu công khai. Mật khẩu lưu bộ nhớ tab.
 
-Không đoán các giá trị path hoặc header. Sau khi thêm hoặc sửa biến, vào Deployments → dấu ... cạnh bản production → Redeploy. Thay đổi env chỉ có hiệu lực ở deployment mới. Mở web → Kết nối API → nhập APP_PASSWORD → Kết nối thật. Không nhập API key vào giao diện.
-
-## 4. Giới hạn API thật
-Adapter chỉ gọi HTTPS chungsucliqi.com, không theo redirect. Hiện dự kiến xác thực bằng header, GET đọc, POST JSON đặt đơn, response `{success:true,data:...}`, payload `{package_id,quantity,referral_codes,note}`. Các giả định này phải đối chiếu tài liệu API thật; nếu khác, sửa lib/chungsuc.js và public/app.js. Giá = giá gói × số lượng × số mã; chỉ bật CS_ENABLE_ORDER=true sau khi xác minh giá, phương thức, schema, quyền sử dụng và kiểm thử đọc. Không tự retry khi timeout vì có thể đơn đã được tạo. Giới hạn chi phí áp dụng từng request, không phải tổng ngày. Chưa có idempotency hay rate limit bền vững; nên bổ sung bảo vệ trước khi dùng chung hoặc triển khai sản xuất lâu dài. Không đặt tự động theo lịch.
-
-Nếu nhà cung cấp yêu cầu xác minh domain, nhập hostname Vercel thực tế (không có https://) và làm theo tài liệu. Backend gọi server-to-server nên CORS trình duyệt không cần thiết; verify chưa được triển khai do thiếu đặc tả.
-
-## 5. Kiểm thử local tùy chọn
-Node.js 22.x. `npm run build` kiểm tra file nguồn; `npm test` chạy mock không tốn Xu. `npm run dev` dùng Vercel CLI (lần đầu có thể yêu cầu tải và đăng nhập). Copy `.env.example` thành `.env.local` nếu cần, điền cấu hình riêng và giữ đặt đơn tắt. Không commit file này.
-
-## 6. Cập nhật sau này
-Upload/commit thay đổi lên branch main của repo Vercel, Vercel sẽ tự deploy nếu bật Git integration. Không sửa repo Cloudflare cũ nếu muốn tránh kích hoạt build cũ. Không cần xóa Cloudflare để Vercel hoạt động.
-
-Tài liệu: https://vercel.com/docs/functions/runtimes/node-js ; https://vercel.com/docs/builds/configure-a-build ; https://vercel.com/docs/environment-variables/managing-environment-variables ; https://vercel.com/docs/deployments/managing-deployments .
+## Kiểm thử
+`npm test`: mock API (không gọi thật), kiểm tra xác thực, response, lịch sử, giá, giới hạn, payload order/retail, duplicate_request, 429, gateway. `npm run build`: kiểm tra entry. `node --check public/app.js`: kiểm tra cú pháp. Chưa thử API live bằng key thật, chưa kiểm thử end-to-end trình duyệt hoặc deploy V3 vào tài khoản. Gói Hobby chỉ dùng phi thương mại. Hosting miễn phí không miễn phí dịch vụ Chung Sức.

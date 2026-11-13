@@ -1,1 +1,1 @@
-{"name":"chungsuc-auto-vercel","version":"2.0.0","private":true,"type":"module","scripts":{"build":"node scripts/build.mjs","test":"node --test tests/api.test.mjs","dev":"npx vercel dev"},"engines":{"node":"22.x"}}
+{"name":"chungsuc-auto-vercel","version":"3.0.0","private":true,"type":"module","scripts":{"build":"node scripts/build.mjs","test":"node --test tests/api.test.mjs","dev":"npx vercel dev"},"engines":{"node":"22.x"}}

@@ -1,47 +1,14 @@
-import test from 'node:test';
-import assert from 'node:assert/strict';
-import {handleRequest} from '../lib/chungsuc.js';
-import gateway from '../api/gateway.js';
-const env={APP_PASSWORD:'test-password-123456',CS_API_KEY:'mock-key',CS_API_KEY_HEADER:'X-API-Key',CS_MAX_ORDER_TOTAL:'500',CS_ENABLE_ORDER:'false'};
-for(const a of ['BALANCE','SERVICES','ORDERS','DETAIL','ORDER'])env['CS_'+a+'_PATH']='/mock/'+a.toLowerCase();
-const body={package_id:1,quantity:2,referral_codes:['TEST1','TEST2'],note:'',confirmed_total:400};
-const req=(action,b,opts={})=>handleRequest({env:opts.env??env,request:new Request('https://test.vercel.app/api?action='+action,{method:opts.method??(b===undefined?'GET':'POST'),headers:{'X-App-Password':opts.password??env.APP_PASSWORD,...(b===undefined?{}:{'Content-Type':'application/json'}),...opts.headers},body:b===undefined?undefined:typeof b==='string'?b:JSON.stringify(b)})});
-test('Vercel API core: auth, routes, schema, limits and one outbound order',async()=>{
- const original=globalThis.fetch;let calls=[];
- globalThis.fetch=async(url,opts)=>{calls.push({url:String(url),opts});assert.equal(url.hostname,'chungsucliqi.com');assert.equal(opts.headers['X-API-Key'],'mock-key');let data=url.pathname.endsWith('/services')?{services:[{id:1,price:100}]}:url.pathname.endsWith('/balance')?{balance:1000}:url.pathname.endsWith('/orders')?{orders:[]}:url.pathname.endsWith('/detail')?{order:{id:123}}:{order_ids:[123]};return new Response(JSON.stringify({success:true,data}));};
- try{
- assert.equal((await req('balance',undefined,{env:{}})).status,503);
- assert.equal((await req('balance',undefined,{password:'wrong'})).status,401);
- assert.equal((await req('balance',undefined,{headers:{Origin:'https://evil.example'}})).status,403);
- assert.equal((await req('unknown')).status,400);
- assert.equal((await req('order')).status,405);
- assert.deepEqual((await (await req('balance')).json()).data,{balance:1000});
- assert.equal((await req('services')).status,200);
- assert.equal((await req('orders&page=2')).status,200);
- assert.equal((await req('detail&order_id=123')).status,200);
- assert.equal((await req('order',body)).status,403);
- env.CS_ENABLE_ORDER='true';
- assert.equal((await req('order','{')).status,400);
- assert.equal((await req('order',null)).status,400);
- assert.equal((await req('order',body,{headers:{'Content-Type':'text/plain'}})).status,415);
- assert.equal((await req('order','x'.repeat(40001))).status,413);
- assert.equal((await req('order',{...body,confirmed_total:300})).status,409);
- assert.equal((await req('order',{...body,quantity:3,confirmed_total:600})).status,409);
- assert.equal((await req('order',{...body,referral_codes:['A','A']})).status,400);
- const r=await req('order',body);assert.equal(r.status,200);assert.deepEqual((await r.json()).data.order_ids,[123]);assert.equal(calls.filter(c=>c.opts.method==='POST').length,1);
- assert.equal(r.headers.get('Cache-Control'),'no-store');
- assert.equal((await req('balance',undefined,{env:{...env,CS_BALANCE_PATH:'/\\evil.example'}})).status,502);
- }finally{globalThis.fetch=original;}
-});
-
-test('Vercel gateway: production entry reads environment, preserves request and response',async()=>{
- const previous={...process.env},original=globalThis.fetch;
- try {
-  Object.assign(process.env,env,{CS_ENABLE_ORDER:'false'});
-  globalThis.fetch=async(url,opts)=>{assert.equal(url.pathname,'/mock/balance');assert.equal(opts.headers['X-API-Key'],'mock-key');return Response.json({success:true,data:{balance:42}});};
-  const r=await gateway.fetch(new Request('https://test.vercel.app/api?action=balance',{headers:{'X-App-Password':env.APP_PASSWORD,Origin:'https://test.vercel.app'}}));
-  assert.equal(r.status,200);assert.deepEqual(await r.json(),{success:true,data:{balance:42}});
-  assert.equal((await gateway.fetch(new Request('https://test.vercel.app/api?action=balance'))).status,401);
-  const disabled=await gateway.fetch(new Request('https://test.vercel.app/api?action=order',{method:'POST',headers:{'X-App-Password':env.APP_PASSWORD,'Content-Type':'application/json'},body:JSON.stringify(body)}));assert.equal(disabled.status,403);
- }finally{globalThis.fetch=original;for(const k of Object.keys(process.env))if(!(k in previous))delete process.env[k];Object.assign(process.env,previous);}
-});
+import test from 'node:test';import assert from 'node:assert/strict';import {handleRequest} from '../lib/chungsuc.js';import gateway from '../api/gateway.js';
+const env={APP_PASSWORD:'mock-password-123456',CS_API_KEY:'mock-key',CS_MAX_ORDER_TOTAL:'5000',CS_ENABLE_ORDER:'false'};
+const item={code:'SS1113ABCDE',type:'order',product:'Gói thử x2',codes:['ABC123','XYZ789'],price:2000,status:'running',progress:{percent:64,tickets_done:97,tickets_total:152}};
+const body={package_id:1,quantity:1,referral_codes:item.codes,note:'',confirmed_total:2000,client_ref:'cs-test-001'};
+const req=(a,b,opts={})=>handleRequest({env:opts.env??env,request:new Request('https://test.vercel.app/api?action='+a,{method:opts.method??(b===undefined?'GET':'POST'),headers:{'X-App-Password':opts.password??env.APP_PASSWORD,...(b===undefined?{}:{'Content-Type':'application/json'}),...opts.headers},body:b===undefined?undefined:typeof b==='string'?b:JSON.stringify(b)})});
+test('official API adapter, auth, history, price and duplicate reference',async()=>{const orig=globalThis.fetch;let calls=[],fault=null;globalThis.fetch=async(u,o)=>{calls.push({u:String(u),o});assert.equal(u.origin,'https://chungsucliqi.com');assert.equal(u.pathname,'/api/v1.php');assert.equal(o.headers['X-API-Key'],'mock-key');let a=u.searchParams.get('action'),d; if(fault){const f=fault;fault=null;return f;}if(a==='me')d={balance:5520,name:'Mock',role:'user'};if(a==='products')d={products:[{id:1,name:'Gói',price:1000,tickets:152,require_code:true}]};if(a==='status')d={order_enabled:true,retail_enabled:true,auto_run:true};if(a==='retail')d={enabled:true,min:1,max:999,unit_name:'bi',unit_price:400,packs:[{key:'pk4',name:'Gói',price:1000}]};if(a==='history'){assert.equal(u.searchParams.get('limit'),'20');d={total:57,spent:812000,orders:[item]};}if(a==='order'||a==='retail_order'){d=item;if(o.method==='POST')return Response.json({ok:true,data:item,balance:3520,duplicate_request:true});}return Response.json({ok:true,data:d});};try{
+assert.equal((await req('balance',undefined,{env:{}})).status,503);assert.equal((await req('balance',undefined,{password:'wrong'})).status,401);assert.equal((await req('balance',undefined,{headers:{Origin:'https://evil.test'}})).status,403);assert.equal((await req('unknown')).status,400);assert.equal((await req('order')).status,405);
+assert.equal((await (await req('balance')).json()).data.balance,5520);assert.equal((await (await req('services')).json()).data.services[0].price,1000);assert.equal((await (await req('retail')).json()).data.unit_price,400);const h=(await (await req('orders&page=2&status=processing')).json()).data;assert.equal(h.pagination.total_pages,3);assert.equal(h.orders[0].status,'processing');assert.match(calls.at(-1).u,/action=history&page=2&limit=20&status=running/);assert.equal((await (await req('detail&order_id=SS1113ABCDE')).json()).data.order.progress,64);
+assert.equal((await req('order',body)).status,403);assert.equal((await req('retail_order',body)).status,403);env.CS_ENABLE_ORDER='true';assert.equal((await req('order','{')).status,400);assert.equal((await req('order',body,{headers:{'Content-Type':'text/plain'}})).status,415);assert.equal((await req('order','x'.repeat(40001))).status,413);assert.equal((await req('order',{...body,quantity:2})).status,400);assert.equal((await req('order',{...body,confirmed_total:300})).status,409);assert.equal((await req('order',body,{env:{...env,CS_MAX_ORDER_TOTAL:'1000'}})).status,409);assert.equal((await req('order',{...body,referral_codes:['ABC123','ABC123']})).status,400);assert.equal((await req('order',{...body,client_ref:''})).status,400);assert.equal(calls.filter(c=>c.o.method==='POST').length,0);
+const r=await req('order',body);assert.equal(r.status,200);assert.equal((await r.json()).data.duplicate_request,true);assert.deepEqual(JSON.parse(calls.at(-1).o.body),{product_id:1,codes:item.codes,client_ref:body.client_ref,note:'',allow_duplicate:false});assert.equal(r.headers.get('Cache-Control'),'no-store');
+assert.equal((await req('retail_order',{...body,referral_codes:['ABC123'],quantity:2,pack:'pk4'})).status,200);assert.deepEqual(JSON.parse(calls.at(-1).o.body),{code:'ABC123',qty:2,pack:'pk4',client_ref:body.client_ref,note:''});assert.equal((await req('retail_order',body)).status,400);
+fault=Response.json({ok:false,error:{code:'rate_limited',message:'Too many'}},{status:429,headers:{'Retry-After':'5'}});const rate=await req('balance');assert.equal(rate.status,429);assert.equal(rate.headers.get('Retry-After'),'5');assert.equal((await rate.json()).retry_after,'5');
+}finally{globalThis.fetch=orig;env.CS_ENABLE_ORDER='false';}});
+test('gateway reads environment and protects API',async()=>{const orig=globalThis.fetch;const old={...process.env};try{Object.assign(process.env,env);globalThis.fetch=async()=>Response.json({ok:true,data:{balance:42}});const r=await gateway.fetch(new Request('https://test.vercel.app/api?action=balance',{headers:{'X-App-Password':env.APP_PASSWORD}}));assert.equal((await r.json()).data.balance,42);assert.equal((await gateway.fetch(new Request('https://test.vercel.app/api?action=balance'))).status,401);}finally{globalThis.fetch=orig;for(const k of Object.keys(process.env))if(!(k in old))delete process.env[k];Object.assign(process.env,old);}});
